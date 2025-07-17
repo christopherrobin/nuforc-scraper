@@ -1,0 +1,27 @@
+{
+  "dependencies": {
+    "cheerio": "^1.1.0",
+    "node-fetch": "^3.0",
+    "node-html-parser": "^7.0.1"
+  },
+  "name": "nuforc_scraper",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^24.0.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "scripts": {
+    "start": "node --loader ts-node/esm nuforc_scraper.ts",
+    "build": "tsc",
+    "scrape": "node --loader ts-node/esm nuforc_scraper.ts",
+    "test-scrape": "node --loader ts-node/esm nuforc_scraper.ts --max-records=200",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "UFO sighting data scraper for NUFORC database"
+}

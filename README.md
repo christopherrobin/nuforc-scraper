@@ -1,0 +1,75 @@
+# NUFORC UFO Sighting Scraper
+
+A Node.js/TypeScript scraper that collects UFO sighting data from the National UFO Reporting Center (NUFORC) database.
+
+## Features
+
+- Scrapes all UFO sighting reports from https://nuforc.org/subndx/?id=all
+- Paginates through all available records
+- Handles rate limiting with configurable delays
+- Provides robust error handling and retry logic
+- Outputs normalized JSON data
+
+## Installation
+
+```bash
+npm install
+```
+
+## Configuration
+
+The scraper can be configured using environment variables:
+
+- `WDT_NONCE`: The NUFORC website's nonce value (defaults to a development value)
+- `REQUEST_DELAY`: Delay between requests in milliseconds (defaults to 1000ms)
+- `MAX_RECORDS`: Maximum number of records to scrape (optional, for testing)
+
+## Usage
+
+Run the scraper to collect all records:
+
+```bash
+npm run scrape
+```
+
+For testing purposes, you can limit the number of records:
+
+```bash
+npm run scrape -- --max-records=10
+```
+
+Or using the start script:
+
+```bash
+npm start -- --max-records=10
+```
+
+## Output
+
+The scraper outputs all UFO sighting data to `nuforc-results.json` in the following format:
+
+```typescript
+type Sighting = {
+  id: string                // Unique id from the URL param in the 'href'
+  href: string              // Relative link to the original sighting details page
+  occurredAt: string        // Date and time the sighting occurred
+  city: string | null       // City (can be null)
+  state: string | null      // State/province/region (can be null)
+  country: string | null    // Country (can be null)
+  shape: string | null      // Shape reported
+  summary: string | null    // Summary text of the report
+  reportedAt: string | null // Date it was reported
+  mediaIncluded: boolean    // Whether a photo or video was included
+  explanation: string | null // Explanation, if any (can be null)
+}
+```
+
+## Development
+
+Build the TypeScript code:
+
+```bash
+npm run build
+```
+
+This will compile the TypeScript code to JavaScript in the `dist` directory.
