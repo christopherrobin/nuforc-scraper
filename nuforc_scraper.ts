@@ -28,8 +28,8 @@ type NuforcApiResponse = {
 
 const ENDPOINT =
   "https://nuforc.org/wp-admin/admin-ajax.php?action=get_wdtable&table_id=1&wdt_var1=Post&wdt_var2=-1"
-// Get WDT_NONCE from environment variable or use default (for development only)
-const WDT_NONCE = process.env.WDT_NONCE || "bb79a2a426"
+// Get WDT_NONCE from environment variable (you can get this by visiting their website)
+const WDT_NONCE = process.env.WDT_NONCE || ""
 // Delay between requests in milliseconds to avoid rate limiting
 const REQUEST_DELAY = process.env.REQUEST_DELAY ? parseInt(process.env.REQUEST_DELAY) : 1000
 // Maximum number of records to scrape (optional, for testing)
@@ -42,7 +42,7 @@ const parseSighting = (row: any[]): Sighting => {
     // Parse href and id from <a ... href="...">...</a>
     const root = parse(row[0] ?? "")
     const link = root.querySelector("a")
-    
+
     if (!link) {
       console.warn("No link found in row:", row[0])
       return {
@@ -59,7 +59,7 @@ const parseSighting = (row: any[]): Sighting => {
         explanation: row[9] ?? null,
       }
     }
-    
+
     const href = link.getAttribute("href") || ""
     const idMatch = href.match(/id=(\d+)/)
     const id = idMatch ? idMatch[1] : ""
@@ -200,14 +200,14 @@ async function main() {
   // Parse command line arguments
   const args = process.argv;
   let maxRecords: number | undefined = MAX_RECORDS;
-  
+
   // Log all arguments for debugging
   console.log('Command line arguments:', args);
-  
+
   // Check for --max-records in any position
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    
+
     // Handle both --max-records=5 and --max-records 5 formats
     if (arg.startsWith('--max-records=')) {
       const value = arg.split('=')[1];
@@ -243,14 +243,14 @@ async function main() {
     try {
       console.log(`Fetching page (start=${start})...`)
       const rows = await fetchPage(start, draw)
-      
+
       if (rows.length === 0) {
         console.log("No more data found, finishing scrape")
         moreData = false
       } else {
         const sightings = rows.map(parseSighting).filter(s => s.id !== "")
         console.log(`Retrieved ${sightings.length} valid sightings from this page`)
-        
+
         // Add sightings up to the max limit
         if (maxRecords) {
           const remainingSlots = maxRecords - allSightings.length;
@@ -277,14 +277,14 @@ async function main() {
           // No max limit, add all sightings
           allSightings = allSightings.concat(sightings)
         }
-        
+
         // Only increment if we're continuing
         if (moreData) {
           start += PAGE_SIZE
           draw += 1
           retryCount = 0 // Reset retry counter on success
         }
-        
+
         // Add delay between requests to avoid rate limiting
         if (moreData) {
           console.log(`Waiting ${REQUEST_DELAY}ms before next request...`)
@@ -294,7 +294,7 @@ async function main() {
     } catch (error) {
       console.error(`Error fetching page (start=${start}):`, error)
       retryCount++
-      
+
       if (retryCount >= maxRetries) {
         console.error(`Failed after ${maxRetries} retries, stopping scrape`)
         moreData = false
@@ -306,7 +306,7 @@ async function main() {
   }
 
   console.log(`Scraped ${allSightings.length} sightings. Writing to nuforc-results.json...`)
-  
+
   try {
     fs.writeFileSync("nuforc-results.json", JSON.stringify(allSightings, null, 2))
     console.log("Successfully wrote data to nuforc-results.json")
@@ -318,7 +318,7 @@ async function main() {
     fs.writeFileSync(backupFilename, JSON.stringify(allSightings, null, 2))
     console.log(`Successfully wrote data to backup file: ${backupFilename}`)
   }
-  
+
   console.log("Done!")
 }
 
