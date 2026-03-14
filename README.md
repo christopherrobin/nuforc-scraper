@@ -1,6 +1,10 @@
 # NUFORC UFO Sighting Scraper
 
-A Node.js/TypeScript scraper that collects UFO sighting data from the National UFO Reporting Center (NUFORC) database.
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)]()
+[![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)]()
+[![MIT License](https://img.shields.io/badge/license-MIT-333333?style=for-the-badge)](LICENSE)
+
+A Node.js/TypeScript scraper that collects UFO sighting data from the [National UFO Reporting Center (NUFORC)](https://nuforc.org) database.
 
 ## Features
 
