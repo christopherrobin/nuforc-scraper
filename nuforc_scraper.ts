@@ -28,8 +28,11 @@ type NuforcApiResponse = {
 
 const ENDPOINT =
   "https://nuforc.org/wp-admin/admin-ajax.php?action=get_wdtable&table_id=1&wdt_var1=Post&wdt_var2=-1"
-// Get WDT_NONCE from environment variable (you can get this by visiting their website)
-const WDT_NONCE = process.env.WDT_NONCE || "6cbfc8a745"
+const WDT_NONCE = process.env.WDT_NONCE
+if (!WDT_NONCE) {
+  console.error("ERROR: WDT_NONCE environment variable is required. Visit nuforc.org/subndx/?id=all and inspect the page source for wdtNonceFrontendServerSide to obtain it.")
+  process.exit(1)
+}
 // Delay between requests in milliseconds to avoid rate limiting
 const REQUEST_DELAY = process.env.REQUEST_DELAY ? parseInt(process.env.REQUEST_DELAY) : 1000
 // Maximum number of records to scrape (optional, for testing)
@@ -175,8 +178,7 @@ async function fetchPage(start: number, draw: number): Promise<any[][]> {
       "x-requested-with": "XMLHttpRequest",
       "origin": "https://nuforc.org",
       "referer": "https://nuforc.org/subndx/?id=all",
-      "user-agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+      "user-agent": "NUFORC-Scraper/1.0 (research; +https://alienquery.com)",
       accept: "application/json, text/javascript, */*; q=0.01",
     },
     body: formBody.toString(),
@@ -201,14 +203,12 @@ async function main() {
   const args = process.argv;
   let maxRecords: number | undefined = MAX_RECORDS;
 
-  // Log all arguments for debugging
-  console.log('Command line arguments:', args);
+  let force = false;
+  let pretty = false;
 
-  // Check for --max-records in any position
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
 
-    // Handle both --max-records=5 and --max-records 5 formats
     if (arg.startsWith('--max-records=')) {
       const value = arg.split('=')[1];
       maxRecords = parseInt(value);
@@ -222,7 +222,11 @@ async function main() {
         console.error('Invalid value for --max-records. Must be a number.');
         process.exit(1);
       }
-      i++; // Skip the next argument since we've processed it
+      i++;
+    } else if (arg === '--force') {
+      force = true;
+    } else if (arg === '--pretty') {
+      pretty = true;
     }
   }
 
@@ -234,7 +238,7 @@ async function main() {
   const maxRetries = 3
 
   console.log("Starting NUFORC scraping...")
-  console.log(`Using WDT_NONCE: ${WDT_NONCE}`)
+  console.log(`Using WDT_NONCE: ${WDT_NONCE.slice(0, 3)}...`)
   if (maxRecords) {
     console.log(`Will scrape a maximum of ${maxRecords} records (for testing)`)
   }
@@ -299,23 +303,43 @@ async function main() {
         console.error(`Failed after ${maxRetries} retries, stopping scrape`)
         moreData = false
       } else {
-        console.log(`Retry ${retryCount}/${maxRetries} after waiting ${REQUEST_DELAY * 2}ms...`)
-        await setTimeout(REQUEST_DELAY * 2) // Wait longer between retries
+        const backoffDelay = REQUEST_DELAY * Math.pow(2, retryCount)
+        console.log(`Retry ${retryCount}/${maxRetries} after waiting ${backoffDelay}ms...`)
+        await setTimeout(backoffDelay)
       }
     }
   }
 
   console.log(`Scraped ${allSightings.length} sightings. Writing to nuforc-results.json...`)
 
+  const outputFile = "nuforc-results.json"
+  const tmpFile = "nuforc-results.tmp.json"
+  const jsonContent = pretty ? JSON.stringify(allSightings, null, 2) : JSON.stringify(allSightings)
+
   try {
-    fs.writeFileSync("nuforc-results.json", JSON.stringify(allSightings, null, 2))
+    fs.writeFileSync(tmpFile, jsonContent)
+
+    if (!maxRecords && fs.existsSync(outputFile)) {
+      try {
+        const existing = JSON.parse(fs.readFileSync(outputFile, "utf-8")) as unknown[]
+        const threshold = existing.length * 0.5
+        if (allSightings.length < threshold && !force) {
+          fs.unlinkSync(tmpFile)
+          console.error(`ABORTED: New scrape has ${allSightings.length} records but existing file has ${existing.length}. This looks like a failed scrape. Use --force to overwrite anyway.`)
+          process.exit(1)
+        }
+      } catch {
+        // If we can't parse the existing file, proceed with overwrite
+      }
+    }
+
+    fs.renameSync(tmpFile, outputFile)
     console.log("Successfully wrote data to nuforc-results.json")
   } catch (error) {
     console.error("Error writing to file:", error)
-    // Try to write to a backup file
     const backupFilename = `nuforc-results-backup-${Date.now()}.json`
     console.log(`Attempting to write to backup file: ${backupFilename}`)
-    fs.writeFileSync(backupFilename, JSON.stringify(allSightings, null, 2))
+    fs.writeFileSync(backupFilename, jsonContent)
     console.log(`Successfully wrote data to backup file: ${backupFilename}`)
   }
 
