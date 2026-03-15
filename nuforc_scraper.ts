@@ -19,8 +19,19 @@ export type Sighting = {
   explanation: string | null
 }
 
-// Type for a single row from the API
-export type SightingRow = (string | null)[]
+// Type for a single row from the API (H2: labeled tuple)
+export type SightingRow = [
+  link: string | null,
+  occurredAt: string | null,
+  city: string | null,
+  state: string | null,
+  country: string | null,
+  shape: string | null,
+  summary: string | null,
+  reportedAt: string | null,
+  hasImage: string | null,
+  explanation: string | null,
+]
 
 // Type for the API response
 type NuforcApiResponse = {
@@ -43,6 +54,24 @@ const PAGE_SIZE = 100
 const OUTPUT_FILE = "nuforc-results.json"
 const TMP_FILE = "nuforc-results.tmp.json"
 
+// M2: Column names for generating form params
+const COLUMN_NAMES = ["Link", "Occurred", "City", "State", "Country", "Shape", "Summary", "Reported", "HasImage", "Explanation"]
+
+// H1: Extract common field mapping (fixes catch-block bug with hardcoded mediaIncluded: false)
+function mapCommonFields(row: SightingRow): Omit<Sighting, 'id' | 'href'> {
+  return {
+    occurredAt: row[1] ?? "",
+    city: row[2] ?? null,
+    state: row[3] ?? null,
+    country: row[4] ?? null,
+    shape: row[5] ?? null,
+    summary: row[6] ?? null,
+    reportedAt: row[7] ?? null,
+    mediaIncluded: row[8] === "Y",
+    explanation: row[9] ?? null,
+  }
+}
+
 export const parseSighting = (row: SightingRow): Sighting => {
   try {
     // Parse href and id from <a ... href="...">...</a>
@@ -51,120 +80,24 @@ export const parseSighting = (row: SightingRow): Sighting => {
 
     if (!link) {
       console.warn("No link found in row:", row[0])
-      return {
-        id: "",
-        href: "",
-        occurredAt: row[1] ?? "",
-        city: row[2] ?? null,
-        state: row[3] ?? null,
-        country: row[4] ?? null,
-        shape: row[5] ?? null,
-        summary: row[6] ?? null,
-        reportedAt: row[7] ?? null,
-        mediaIncluded: row[8] === "Y",
-        explanation: row[9] ?? null,
-      }
+      return { id: "", href: "", ...mapCommonFields(row) }
     }
 
     const href = link.getAttribute("href") || ""
     const idMatch = href.match(/id=(\d+)/)
     const id = idMatch ? idMatch[1] : ""
 
-    return {
-      id,
-      href,
-      occurredAt: row[1] ?? "",
-      city: row[2] ?? null,
-      state: row[3] ?? null,
-      country: row[4] ?? null,
-      shape: row[5] ?? null,
-      summary: row[6] ?? null,
-      reportedAt: row[7] ?? null,
-      mediaIncluded: row[8] === "Y",
-      explanation: row[9] ?? null,
-    }
+    return { id, href, ...mapCommonFields(row) }
   } catch (error) {
     console.error("Error parsing sighting:", error)
-    // Return a default object with empty/null values
-    return {
-      id: "",
-      href: "",
-      occurredAt: row[1] ?? "",
-      city: row[2] ?? null,
-      state: row[3] ?? null,
-      country: row[4] ?? null,
-      shape: row[5] ?? null,
-      summary: row[6] ?? null,
-      reportedAt: row[7] ?? null,
-      mediaIncluded: false,
-      explanation: row[9] ?? null,
-    }
+    return { id: "", href: "", ...mapCommonFields(row) }
   }
 }
 
 async function fetchPage(start: number, draw: number): Promise<SightingRow[]> {
-  const formBody = new URLSearchParams({
+  // M2: Generate column definitions in a loop
+  const params: Record<string, string> = {
     draw: draw.toString(),
-    "columns[0][data]": "0",
-    "columns[0][name]": "Link",
-    "columns[0][searchable]": "true",
-    "columns[0][orderable]": "false",
-    "columns[0][search][value]": "",
-    "columns[0][search][regex]": "false",
-    "columns[1][data]": "1",
-    "columns[1][name]": "Occurred",
-    "columns[1][searchable]": "true",
-    "columns[1][orderable]": "true",
-    "columns[1][search][value]": "",
-    "columns[1][search][regex]": "false",
-    "columns[2][data]": "2",
-    "columns[2][name]": "City",
-    "columns[2][searchable]": "true",
-    "columns[2][orderable]": "true",
-    "columns[2][search][value]": "",
-    "columns[2][search][regex]": "false",
-    "columns[3][data]": "3",
-    "columns[3][name]": "State",
-    "columns[3][searchable]": "true",
-    "columns[3][orderable]": "true",
-    "columns[3][search][value]": "",
-    "columns[3][search][regex]": "false",
-    "columns[4][data]": "4",
-    "columns[4][name]": "Country",
-    "columns[4][searchable]": "true",
-    "columns[4][orderable]": "true",
-    "columns[4][search][value]": "",
-    "columns[4][search][regex]": "false",
-    "columns[5][data]": "5",
-    "columns[5][name]": "Shape",
-    "columns[5][searchable]": "true",
-    "columns[5][orderable]": "true",
-    "columns[5][search][value]": "",
-    "columns[5][search][regex]": "false",
-    "columns[6][data]": "6",
-    "columns[6][name]": "Summary",
-    "columns[6][searchable]": "true",
-    "columns[6][orderable]": "true",
-    "columns[6][search][value]": "",
-    "columns[6][search][regex]": "false",
-    "columns[7][data]": "7",
-    "columns[7][name]": "Reported",
-    "columns[7][searchable]": "true",
-    "columns[7][orderable]": "true",
-    "columns[7][search][value]": "",
-    "columns[7][search][regex]": "false",
-    "columns[8][data]": "8",
-    "columns[8][name]": "HasImage",
-    "columns[8][searchable]": "true",
-    "columns[8][orderable]": "true",
-    "columns[8][search][value]": "",
-    "columns[8][search][regex]": "false",
-    "columns[9][data]": "9",
-    "columns[9][name]": "Explanation",
-    "columns[9][searchable]": "true",
-    "columns[9][orderable]": "true",
-    "columns[9][search][value]": "",
-    "columns[9][search][regex]": "false",
     "order[0][column]": "1",
     "order[0][dir]": "desc",
     start: start.toString(),
@@ -172,7 +105,18 @@ async function fetchPage(start: number, draw: number): Promise<SightingRow[]> {
     "search[value]": "",
     "search[regex]": "false",
     wdtNonce: WDT_NONCE,
+  }
+
+  COLUMN_NAMES.forEach((name, i) => {
+    params[`columns[${i}][data]`] = String(i)
+    params[`columns[${i}][name]`] = name
+    params[`columns[${i}][searchable]`] = "true"
+    params[`columns[${i}][orderable]`] = i === 0 ? "false" : "true"
+    params[`columns[${i}][search][value]`] = ""
+    params[`columns[${i}][search][regex]`] = "false"
   })
+
+  const formBody = new URLSearchParams(params)
 
   const resp = await fetch(ENDPOINT, {
     method: "POST",
@@ -193,14 +137,19 @@ async function fetchPage(start: number, draw: number): Promise<SightingRow[]> {
   }
 
   try {
-    const data = await resp.json() as NuforcApiResponse
-    return (data && data.data) ? data.data : []
+    // M1: Runtime validation on resp.json()
+    const json = await resp.json()
+    if (!json || !Array.isArray((json as NuforcApiResponse).data)) {
+      throw new Error(`Unexpected API response shape: ${JSON.stringify(json).slice(0, 200)}`)
+    }
+    return (json as NuforcApiResponse).data as SightingRow[]
   } catch (error) {
     console.error("Error parsing JSON response:", error)
     throw new Error(`Failed to parse JSON response: ${error}`)
   }
 }
 
+// M3: parseArgs throws instead of process.exit(1)
 export function parseArgs(argv: string[]): { maxRecords?: number; force: boolean; pretty: boolean } {
   let maxRecords: number | undefined = undefined;
   let force = false;
@@ -213,14 +162,12 @@ export function parseArgs(argv: string[]): { maxRecords?: number; force: boolean
       const value = arg.split('=')[1];
       maxRecords = Number(value);
       if (!Number.isFinite(maxRecords) || maxRecords <= 0) {
-        console.error('Invalid value for --max-records. Must be a positive number.');
-        process.exit(1);
+        throw new Error('Invalid value for --max-records. Must be a positive number.');
       }
     } else if (arg === '--max-records' && i + 1 < argv.length) {
       maxRecords = Number(argv[i + 1]);
       if (!Number.isFinite(maxRecords) || maxRecords <= 0) {
-        console.error('Invalid value for --max-records. Must be a positive number.');
-        process.exit(1);
+        throw new Error('Invalid value for --max-records. Must be a positive number.');
       }
       i++;
     } else if (arg === '--force') {
@@ -239,18 +186,10 @@ export function shouldAbortWrite(newCount: number, existingCount: number, force:
   return newCount < threshold && !force;
 }
 
-async function main() {
-  if (!WDT_NONCE) {
-    console.error("ERROR: WDT_NONCE environment variable is required. Visit nuforc.org/subndx/?id=all and inspect the page source for wdtNonceFrontendServerSide to obtain it.")
-    process.exit(1)
-  }
-
-  const parsed = parseArgs(process.argv);
-  let maxRecords = parsed.maxRecords ?? MAX_RECORDS;
-  let force = parsed.force;
-  let pretty = parsed.pretty;
-
-  let allSightings: Sighting[] = []
+// H3: Extracted scrape logic from main()
+async function scrapeAll(options: { maxRecords?: number }): Promise<Sighting[]> {
+  const { maxRecords } = options
+  const allSightings: Sighting[] = []
   let draw = 1
   let start = 0
   let moreData = true
@@ -279,17 +218,14 @@ async function main() {
         if (maxRecords) {
           const remainingSlots = maxRecords - allSightings.length;
           if (remainingSlots <= 0) {
-            // We've already reached the limit, don't add more
             console.log(`Already reached maximum of ${maxRecords} records, stopping scrape`)
             moreData = false;
           } else if (remainingSlots < sightings.length) {
-            // Only add up to the limit
             console.log(`Adding ${remainingSlots} more records to reach limit of ${maxRecords}`)
             allSightings.push(...sightings.slice(0, remainingSlots))
             console.log(`Reached maximum of ${maxRecords} records, stopping scrape`)
             moreData = false;
           } else {
-            // Add all sightings from this page
             allSightings.push(...sightings)
             console.log(`Now have ${allSightings.length}/${maxRecords} records`)
             if (allSightings.length === maxRecords) {
@@ -298,18 +234,15 @@ async function main() {
             }
           }
         } else {
-          // No max limit, add all sightings
           allSightings.push(...sightings)
         }
 
-        // Only increment if we're continuing
         if (moreData) {
           start += PAGE_SIZE
           draw += 1
-          retryCount = 0 // Reset retry counter on success
+          retryCount = 0
         }
 
-        // Add delay between requests to avoid rate limiting
         if (moreData) {
           console.log(`Waiting ${REQUEST_DELAY}ms before next request...`)
           await setTimeout(REQUEST_DELAY)
@@ -330,19 +263,27 @@ async function main() {
     }
   }
 
-  console.log(`Scraped ${allSightings.length} sightings. Writing to ${OUTPUT_FILE}...`)
+  return allSightings
+}
 
-  const jsonContent = pretty ? JSON.stringify(allSightings, null, 2) : JSON.stringify(allSightings)
+// H3: Extracted write logic from main()
+function writeResultsSafely(sightings: Sighting[], options: { pretty: boolean; force: boolean; maxRecords?: number }): void {
+  const { pretty, force, maxRecords } = options
+
+  console.log(`Scraped ${sightings.length} sightings. Writing to ${OUTPUT_FILE}...`)
+
+  const jsonContent = pretty ? JSON.stringify(sightings, null, 2) : JSON.stringify(sightings)
 
   try {
     fs.writeFileSync(TMP_FILE, jsonContent)
 
     if (!maxRecords && fs.existsSync(OUTPUT_FILE)) {
       try {
-        const existing = JSON.parse(fs.readFileSync(OUTPUT_FILE, "utf-8")) as unknown[]
-        if (shouldAbortWrite(allSightings.length, existing.length, force)) {
+        // M4: Array.isArray guard on existing file parse
+        const parsed = JSON.parse(fs.readFileSync(OUTPUT_FILE, "utf-8"))
+        if (Array.isArray(parsed) && shouldAbortWrite(sightings.length, parsed.length, force)) {
           fs.unlinkSync(TMP_FILE)
-          console.error(`ABORTED: New scrape has ${allSightings.length} records but existing file has ${existing.length}. This looks like a failed scrape. Use --force to overwrite anyway.`)
+          console.error(`ABORTED: New scrape has ${sightings.length} records but existing file has ${parsed.length}. This looks like a failed scrape. Use --force to overwrite anyway.`)
           process.exit(1)
         }
       } catch {
@@ -361,9 +302,34 @@ async function main() {
       console.log(`Successfully wrote data to backup file: ${backupFilename}`)
     } catch (backupError) {
       console.error("Backup write also failed:", backupError)
-      console.error(`${allSightings.length} records were scraped but could not be saved.`)
+      console.error(`${sightings.length} records were scraped but could not be saved.`)
     }
   }
+}
+
+async function main() {
+  if (!WDT_NONCE) {
+    console.error("ERROR: WDT_NONCE environment variable is required. Visit nuforc.org/subndx/?id=all and inspect the page source for wdtNonceFrontendServerSide to obtain it.")
+    process.exit(1)
+  }
+
+  // M3: Wrap parseArgs in try/catch since it now throws
+  let parsed: ReturnType<typeof parseArgs>;
+  try {
+    parsed = parseArgs(process.argv);
+  } catch (error) {
+    console.error((error as Error).message);
+    process.exit(1);
+    return; // unreachable, but helps TS narrow `parsed`
+  }
+
+  const maxRecords = parsed.maxRecords ?? MAX_RECORDS;
+  const force = parsed.force;
+  const pretty = parsed.pretty;
+
+  const allSightings = await scrapeAll({ maxRecords })
+
+  writeResultsSafely(allSightings, { pretty, force, maxRecords })
 
   console.log("Done!")
 }

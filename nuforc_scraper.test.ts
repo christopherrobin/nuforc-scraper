@@ -14,8 +14,8 @@ describe("parseSighting", () => {
       "2024-01-16",
       "Y",
       null,
-    ];
-    const result = parseSighting(row);
+    ] as const;
+    const result = parseSighting([...row]);
     expect(result.id).toBe("12345");
     expect(result.href).toBe("https://nuforc.org/sighting/?id=12345");
     expect(result.occurredAt).toBe("2024-01-15");
@@ -41,8 +41,8 @@ describe("parseSighting", () => {
       "2024-02-02",
       "N",
       null,
-    ];
-    const result = parseSighting(row);
+    ] as const;
+    const result = parseSighting([...row]);
     expect(result.id).toBe("");
     expect(result.href).toBe("");
     expect(result.city).toBe("Denver");
@@ -61,8 +61,8 @@ describe("parseSighting", () => {
       null,
       null,
       null,
-    ];
-    const result = parseSighting(row);
+    ] as const;
+    const result = parseSighting([...row]);
     expect(result.id).toBe("99");
     expect(result.occurredAt).toBe("");
     expect(result.city).toBeNull();
@@ -79,11 +79,11 @@ describe("parseSighting", () => {
     const makeRow = (media: string | null) => [
       '<a href="https://nuforc.org/sighting/?id=1">X</a>',
       "", null, null, null, null, null, null, media, null,
-    ];
-    expect(parseSighting(makeRow("Y")).mediaIncluded).toBe(true);
-    expect(parseSighting(makeRow("N")).mediaIncluded).toBe(false);
-    expect(parseSighting(makeRow("")).mediaIncluded).toBe(false);
-    expect(parseSighting(makeRow(null)).mediaIncluded).toBe(false);
+    ] as const;
+    expect(parseSighting([...makeRow("Y")]).mediaIncluded).toBe(true);
+    expect(parseSighting([...makeRow("N")]).mediaIncluded).toBe(false);
+    expect(parseSighting([...makeRow("")]).mediaIncluded).toBe(false);
+    expect(parseSighting([...makeRow(null)]).mediaIncluded).toBe(false);
   });
 
   it("handles malformed HTML without throwing", () => {
@@ -91,9 +91,9 @@ describe("parseSighting", () => {
       '<a href="broken>no closing quote',
       "2024-01-01",
       null, null, null, null, null, null, null, null,
-    ];
-    expect(() => parseSighting(row)).not.toThrow();
-    const result = parseSighting(row);
+    ] as const;
+    expect(() => parseSighting([...row])).not.toThrow();
+    const result = parseSighting([...row]);
     expect(result).toHaveProperty("id");
     expect(result).toHaveProperty("occurredAt", "2024-01-01");
   });
@@ -125,6 +125,25 @@ describe("parseArgs", () => {
     expect(result.maxRecords).toBeUndefined();
     expect(result.force).toBe(false);
     expect(result.pretty).toBe(false);
+  });
+
+  // M3: parseArgs now throws for invalid --max-records values
+  it("throws for --max-records=abc", () => {
+    expect(() => parseArgs(["node", "script.ts", "--max-records=abc"])).toThrow(
+      "Invalid value for --max-records. Must be a positive number."
+    );
+  });
+
+  it("throws for --max-records=0", () => {
+    expect(() => parseArgs(["node", "script.ts", "--max-records=0"])).toThrow(
+      "Invalid value for --max-records. Must be a positive number."
+    );
+  });
+
+  it("throws for --max-records=-5", () => {
+    expect(() => parseArgs(["node", "script.ts", "--max-records=-5"])).toThrow(
+      "Invalid value for --max-records. Must be a positive number."
+    );
   });
 });
 
