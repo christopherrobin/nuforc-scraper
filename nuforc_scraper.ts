@@ -19,7 +19,7 @@ export type Sighting = {
   explanation: string | null
 }
 
-// Type for a single row from the API (H2: labeled tuple)
+// Type for a single row from the API
 export type SightingRow = [
   link: string | null,
   occurredAt: string | null,
@@ -54,10 +54,10 @@ const PAGE_SIZE = 100
 const OUTPUT_FILE = "nuforc-results.json"
 const TMP_FILE = "nuforc-results.tmp.json"
 
-// M2: Column names for generating form params
+// Column names for generating API form params
 const COLUMN_NAMES = ["Link", "Occurred", "City", "State", "Country", "Shape", "Summary", "Reported", "HasImage", "Explanation"]
 
-// H1: Extract common field mapping (fixes catch-block bug with hardcoded mediaIncluded: false)
+// Common field mapping shared across parseSighting branches
 function mapCommonFields(row: SightingRow): Omit<Sighting, 'id' | 'href'> {
   return {
     occurredAt: row[1] ?? "",
@@ -94,8 +94,7 @@ export const parseSighting = (row: SightingRow): Sighting => {
   }
 }
 
-async function fetchPage(start: number, draw: number): Promise<SightingRow[]> {
-  // M2: Generate column definitions in a loop
+function buildFetchBody(start: number, draw: number): URLSearchParams {
   const params: Record<string, string> = {
     draw: draw.toString(),
     "order[0][column]": "1",
@@ -116,7 +115,11 @@ async function fetchPage(start: number, draw: number): Promise<SightingRow[]> {
     params[`columns[${i}][search][regex]`] = "false"
   })
 
-  const formBody = new URLSearchParams(params)
+  return new URLSearchParams(params)
+}
+
+async function fetchPage(start: number, draw: number): Promise<SightingRow[]> {
+  const formBody = buildFetchBody(start, draw)
 
   const resp = await fetch(ENDPOINT, {
     method: "POST",
@@ -137,7 +140,7 @@ async function fetchPage(start: number, draw: number): Promise<SightingRow[]> {
   }
 
   try {
-    // M1: Runtime validation on resp.json()
+    // Validate response shape at runtime
     const json = await resp.json()
     if (!json || !Array.isArray((json as NuforcApiResponse).data)) {
       throw new Error(`Unexpected API response shape: ${JSON.stringify(json).slice(0, 200)}`)
@@ -149,35 +152,35 @@ async function fetchPage(start: number, draw: number): Promise<SightingRow[]> {
   }
 }
 
-// M3: parseArgs throws instead of process.exit(1)
+function parsePositiveNumber(value: string, flag: string): number {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 0) {
+    throw new Error(`Invalid value for ${flag}. Must be a positive number.`)
+  }
+  return n
+}
+
 export function parseArgs(argv: string[]): { maxRecords?: number; force: boolean; pretty: boolean } {
-  let maxRecords: number | undefined = undefined;
-  let force = false;
-  let pretty = false;
+  let maxRecords: number | undefined = undefined
+  let force = false
+  let pretty = false
 
   for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
+    const arg = argv[i]
 
     if (arg.startsWith('--max-records=')) {
-      const value = arg.split('=')[1];
-      maxRecords = Number(value);
-      if (!Number.isFinite(maxRecords) || maxRecords <= 0) {
-        throw new Error('Invalid value for --max-records. Must be a positive number.');
-      }
+      maxRecords = parsePositiveNumber(arg.split('=')[1], '--max-records')
     } else if (arg === '--max-records' && i + 1 < argv.length) {
-      maxRecords = Number(argv[i + 1]);
-      if (!Number.isFinite(maxRecords) || maxRecords <= 0) {
-        throw new Error('Invalid value for --max-records. Must be a positive number.');
-      }
-      i++;
+      maxRecords = parsePositiveNumber(argv[i + 1], '--max-records')
+      i++
     } else if (arg === '--force') {
-      force = true;
+      force = true
     } else if (arg === '--pretty') {
-      pretty = true;
+      pretty = true
     }
   }
 
-  return { maxRecords, force, pretty };
+  return { maxRecords, force, pretty }
 }
 
 export function shouldAbortWrite(newCount: number, existingCount: number, force: boolean): boolean {
@@ -186,7 +189,7 @@ export function shouldAbortWrite(newCount: number, existingCount: number, force:
   return newCount < threshold && !force;
 }
 
-// H3: Extracted scrape logic from main()
+// Paginated scrape with retry and backoff
 async function scrapeAll(options: { maxRecords?: number }): Promise<Sighting[]> {
   const { maxRecords } = options
   const allSightings: Sighting[] = []
@@ -266,7 +269,7 @@ async function scrapeAll(options: { maxRecords?: number }): Promise<Sighting[]> 
   return allSightings
 }
 
-// H3: Extracted write logic from main()
+// Safe file write with abort check and backup
 function writeResultsSafely(sightings: Sighting[], options: { pretty: boolean; force: boolean; maxRecords?: number }): void {
   const { pretty, force, maxRecords } = options
 
@@ -279,7 +282,7 @@ function writeResultsSafely(sightings: Sighting[], options: { pretty: boolean; f
 
     if (!maxRecords && fs.existsSync(OUTPUT_FILE)) {
       try {
-        // M4: Array.isArray guard on existing file parse
+        // Validate existing file is an array before comparing counts
         const parsed = JSON.parse(fs.readFileSync(OUTPUT_FILE, "utf-8"))
         if (Array.isArray(parsed) && shouldAbortWrite(sightings.length, parsed.length, force)) {
           fs.unlinkSync(TMP_FILE)
@@ -313,14 +316,13 @@ async function main() {
     process.exit(1)
   }
 
-  // M3: Wrap parseArgs in try/catch since it now throws
-  let parsed: ReturnType<typeof parseArgs>;
+  let parsed: ReturnType<typeof parseArgs>
   try {
-    parsed = parseArgs(process.argv);
+    parsed = parseArgs(process.argv)
   } catch (error) {
-    console.error((error as Error).message);
-    process.exit(1);
-    return; // unreachable, but helps TS narrow `parsed`
+    console.error((error as Error).message)
+    process.exit(1)
+    return
   }
 
   const maxRecords = parsed.maxRecords ?? MAX_RECORDS;
