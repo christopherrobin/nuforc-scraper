@@ -28,11 +28,7 @@ type NuforcApiResponse = {
 
 const ENDPOINT =
   "https://nuforc.org/wp-admin/admin-ajax.php?action=get_wdtable&table_id=1&wdt_var1=Post&wdt_var2=-1"
-const WDT_NONCE = process.env.WDT_NONCE
-if (!WDT_NONCE) {
-  console.error("ERROR: WDT_NONCE environment variable is required. Visit nuforc.org/subndx/?id=all and inspect the page source for wdtNonceFrontendServerSide to obtain it.")
-  process.exit(1)
-}
+const WDT_NONCE = process.env.WDT_NONCE ?? ""
 // Delay between requests in milliseconds to avoid rate limiting
 const REQUEST_DELAY = process.env.REQUEST_DELAY ? parseInt(process.env.REQUEST_DELAY) : 1000
 // Maximum number of records to scrape (optional, for testing)
@@ -40,7 +36,7 @@ const MAX_RECORDS = process.env.MAX_RECORDS ? parseInt(process.env.MAX_RECORDS) 
 
 const PAGE_SIZE = 100
 
-const parseSighting = (row: any[]): Sighting => {
+export const parseSighting = (row: any[]): Sighting => {
   try {
     // Parse href and id from <a ... href="...">...</a>
     const root = parse(row[0] ?? "")
@@ -198,16 +194,13 @@ async function fetchPage(start: number, draw: number): Promise<any[][]> {
   }
 }
 
-async function main() {
-  // Parse command line arguments
-  const args = process.argv;
-  let maxRecords: number | undefined = MAX_RECORDS;
-
+export function parseArgs(argv: string[]): { maxRecords?: number; force: boolean; pretty: boolean } {
+  let maxRecords: number | undefined = undefined;
   let force = false;
   let pretty = false;
 
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
 
     if (arg.startsWith('--max-records=')) {
       const value = arg.split('=')[1];
@@ -216,8 +209,8 @@ async function main() {
         console.error('Invalid value for --max-records. Must be a number.');
         process.exit(1);
       }
-    } else if (arg === '--max-records' && i + 1 < args.length) {
-      maxRecords = parseInt(args[i + 1]);
+    } else if (arg === '--max-records' && i + 1 < argv.length) {
+      maxRecords = parseInt(argv[i + 1]);
       if (isNaN(maxRecords)) {
         console.error('Invalid value for --max-records. Must be a number.');
         process.exit(1);
@@ -229,6 +222,26 @@ async function main() {
       pretty = true;
     }
   }
+
+  return { maxRecords, force, pretty };
+}
+
+export function shouldAbortWrite(newCount: number, existingCount: number, force: boolean): boolean {
+  if (existingCount === 0) return false;
+  const threshold = existingCount * 0.5;
+  return newCount < threshold && !force;
+}
+
+async function main() {
+  if (!WDT_NONCE) {
+    console.error("ERROR: WDT_NONCE environment variable is required. Visit nuforc.org/subndx/?id=all and inspect the page source for wdtNonceFrontendServerSide to obtain it.")
+    process.exit(1)
+  }
+
+  const parsed = parseArgs(process.argv);
+  let maxRecords = parsed.maxRecords ?? MAX_RECORDS;
+  let force = parsed.force;
+  let pretty = parsed.pretty;
 
   let allSightings: Sighting[] = []
   let draw = 1
@@ -322,8 +335,7 @@ async function main() {
     if (!maxRecords && fs.existsSync(outputFile)) {
       try {
         const existing = JSON.parse(fs.readFileSync(outputFile, "utf-8")) as unknown[]
-        const threshold = existing.length * 0.5
-        if (allSightings.length < threshold && !force) {
+        if (shouldAbortWrite(allSightings.length, existing.length, force)) {
           fs.unlinkSync(tmpFile)
           console.error(`ABORTED: New scrape has ${allSightings.length} records but existing file has ${existing.length}. This looks like a failed scrape. Use --force to overwrite anyway.`)
           process.exit(1)
@@ -346,7 +358,10 @@ async function main() {
   console.log("Done!")
 }
 
-main().catch((err) => {
-  console.error(err)
-  process.exit(1)
-})
+const isDirectRun = process.argv[1]?.includes("nuforc_scraper")
+if (isDirectRun) {
+  main().catch((err) => {
+    console.error(err)
+    process.exit(1)
+  })
+}
