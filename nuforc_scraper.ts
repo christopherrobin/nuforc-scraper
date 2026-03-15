@@ -2,6 +2,7 @@ import fetch from "node-fetch";
 import fs from "fs";
 import { parse } from "node-html-parser";
 import { setTimeout } from "timers/promises";
+import { fileURLToPath } from "url";
 
 // Type for a single sighting entry
 export type Sighting = {
@@ -30,9 +31,10 @@ const ENDPOINT =
   "https://nuforc.org/wp-admin/admin-ajax.php?action=get_wdtable&table_id=1&wdt_var1=Post&wdt_var2=-1"
 const WDT_NONCE = process.env.WDT_NONCE ?? ""
 // Delay between requests in milliseconds to avoid rate limiting
-const REQUEST_DELAY = process.env.REQUEST_DELAY ? parseInt(process.env.REQUEST_DELAY) : 1000
-// Maximum number of records to scrape (optional, for testing)
-const MAX_RECORDS = process.env.MAX_RECORDS ? parseInt(process.env.MAX_RECORDS) : undefined
+const parsedDelay = Number(process.env.REQUEST_DELAY)
+const REQUEST_DELAY = Number.isFinite(parsedDelay) && parsedDelay > 0 ? parsedDelay : 1000
+const parsedMaxRecords = Number(process.env.MAX_RECORDS)
+const MAX_RECORDS = Number.isFinite(parsedMaxRecords) && parsedMaxRecords > 0 ? parsedMaxRecords : undefined
 
 const PAGE_SIZE = 100
 
@@ -204,15 +206,15 @@ export function parseArgs(argv: string[]): { maxRecords?: number; force: boolean
 
     if (arg.startsWith('--max-records=')) {
       const value = arg.split('=')[1];
-      maxRecords = parseInt(value);
-      if (isNaN(maxRecords)) {
-        console.error('Invalid value for --max-records. Must be a number.');
+      maxRecords = Number(value);
+      if (!Number.isFinite(maxRecords) || maxRecords <= 0) {
+        console.error('Invalid value for --max-records. Must be a positive number.');
         process.exit(1);
       }
     } else if (arg === '--max-records' && i + 1 < argv.length) {
-      maxRecords = parseInt(argv[i + 1]);
-      if (isNaN(maxRecords)) {
-        console.error('Invalid value for --max-records. Must be a number.');
+      maxRecords = Number(argv[i + 1]);
+      if (!Number.isFinite(maxRecords) || maxRecords <= 0) {
+        console.error('Invalid value for --max-records. Must be a positive number.');
         process.exit(1);
       }
       i++;
@@ -251,7 +253,7 @@ async function main() {
   const maxRetries = 3
 
   console.log("Starting NUFORC scraping...")
-  console.log(`Using WDT_NONCE: ${WDT_NONCE.slice(0, 3)}...`)
+  console.log("WDT_NONCE: set")
   if (maxRecords) {
     console.log(`Will scrape a maximum of ${maxRecords} records (for testing)`)
   }
@@ -278,12 +280,12 @@ async function main() {
           } else if (remainingSlots < sightings.length) {
             // Only add up to the limit
             console.log(`Adding ${remainingSlots} more records to reach limit of ${maxRecords}`)
-            allSightings = allSightings.concat(sightings.slice(0, remainingSlots))
+            allSightings.push(...sightings.slice(0, remainingSlots))
             console.log(`Reached maximum of ${maxRecords} records, stopping scrape`)
             moreData = false;
           } else {
             // Add all sightings from this page
-            allSightings = allSightings.concat(sightings)
+            allSightings.push(...sightings)
             console.log(`Now have ${allSightings.length}/${maxRecords} records`)
             if (allSightings.length === maxRecords) {
               console.log(`Exactly reached maximum of ${maxRecords} records, stopping scrape`)
@@ -292,7 +294,7 @@ async function main() {
           }
         } else {
           // No max limit, add all sightings
-          allSightings = allSightings.concat(sightings)
+          allSightings.push(...sightings)
         }
 
         // Only increment if we're continuing
@@ -351,14 +353,20 @@ async function main() {
     console.error("Error writing to file:", error)
     const backupFilename = `nuforc-results-backup-${Date.now()}.json`
     console.log(`Attempting to write to backup file: ${backupFilename}`)
-    fs.writeFileSync(backupFilename, jsonContent)
-    console.log(`Successfully wrote data to backup file: ${backupFilename}`)
+    try {
+      fs.writeFileSync(backupFilename, jsonContent)
+      console.log(`Successfully wrote data to backup file: ${backupFilename}`)
+    } catch (backupError) {
+      console.error("Backup write also failed:", backupError)
+      console.error(`${allSightings.length} records were scraped but could not be saved.`)
+    }
   }
 
   console.log("Done!")
 }
 
-const isDirectRun = process.argv[1]?.includes("nuforc_scraper")
+const __filename = fileURLToPath(import.meta.url)
+const isDirectRun = process.argv[1] === __filename
 if (isDirectRun) {
   main().catch((err) => {
     console.error(err)

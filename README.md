@@ -26,7 +26,7 @@ npm install
 
 The scraper can be configured using environment variables:
 
-- `WDT_NONCE`: The NUFORC website's nonce value (defaults to a development value)
+- `WDT_NONCE`: **Required.** The NUFORC website's nonce value. Visit nuforc.org/subndx/?id=all and inspect the page source for `wdtNonceFrontendServerSide` to obtain it
 - `REQUEST_DELAY`: Delay between requests in milliseconds (defaults to 1000ms)
 - `MAX_RECORDS`: Maximum number of records to scrape (optional, for testing)
 
