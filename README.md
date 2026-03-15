@@ -2,9 +2,9 @@
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)]()
 [![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)]()
-[![Vitest](https://img.shields.io/badge/Vitest-2dce6d?style=for-the-badge&logo=vitest&logoColor=white)]()
+[![Vitest](https://img.shields.io/badge/Vitest-1b7a3d?style=for-the-badge&logo=vitest&logoColor=white)]()
 [![MIT License](https://img.shields.io/badge/license-MIT-333333?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/github/actions/workflow/status/christopherrobin/nuforc-scraper/test.yml?style=for-the-badge&label=tests)](https://github.com/christopherrobin/nuforc-scraper/actions/workflows/test.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/christopherrobin/nuforc-scraper/test.yml?style=for-the-badge&label=tests&color=1b7a3d)](https://github.com/christopherrobin/nuforc-scraper/actions/workflows/test.yml)
 
 A Node.js/TypeScript scraper that collects UFO sighting data from the [National UFO Reporting Center (NUFORC)](https://nuforc.org) database.
 
