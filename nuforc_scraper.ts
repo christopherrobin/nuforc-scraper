@@ -29,7 +29,7 @@ type NuforcApiResponse = {
 const ENDPOINT =
   "https://nuforc.org/wp-admin/admin-ajax.php?action=get_wdtable&table_id=1&wdt_var1=Post&wdt_var2=-1"
 // Get WDT_NONCE from environment variable (you can get this by visiting their website)
-const WDT_NONCE = process.env.WDT_NONCE || ""
+const WDT_NONCE = process.env.WDT_NONCE || "6cbfc8a745"
 // Delay between requests in milliseconds to avoid rate limiting
 const REQUEST_DELAY = process.env.REQUEST_DELAY ? parseInt(process.env.REQUEST_DELAY) : 1000
 // Maximum number of records to scrape (optional, for testing)
