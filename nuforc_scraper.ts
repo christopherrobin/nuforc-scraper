@@ -4,7 +4,6 @@ import { parse } from "node-html-parser";
 import { setTimeout } from "timers/promises";
 import { fileURLToPath } from "url";
 
-// Type for a single sighting entry
 export type Sighting = {
   id: string
   href: string
@@ -19,7 +18,6 @@ export type Sighting = {
   explanation: string | null
 }
 
-// Type for a single row from the API
 export type SightingRow = [
   link: string | null,
   occurredAt: string | null,
@@ -33,7 +31,6 @@ export type SightingRow = [
   explanation: string | null,
 ]
 
-// Type for the API response
 type NuforcApiResponse = {
   draw: number
   recordsTotal: number
@@ -54,10 +51,8 @@ const PAGE_SIZE = 100
 const OUTPUT_FILE = "nuforc-results.json"
 const TMP_FILE = "nuforc-results.tmp.json"
 
-// Column names for generating API form params
 const COLUMN_NAMES = ["Link", "Occurred", "City", "State", "Country", "Shape", "Summary", "Reported", "HasImage", "Explanation"]
 
-// Common field mapping shared across parseSighting branches
 function mapCommonFields(row: SightingRow): Omit<Sighting, 'id' | 'href'> {
   return {
     occurredAt: row[1] ?? "",
@@ -74,7 +69,6 @@ function mapCommonFields(row: SightingRow): Omit<Sighting, 'id' | 'href'> {
 
 export const parseSighting = (row: SightingRow): Sighting => {
   try {
-    // Parse href and id from <a ... href="...">...</a>
     const root = parse(row[0] ?? "")
     const link = root.querySelector("a")
 
@@ -110,6 +104,7 @@ function buildFetchBody(start: number, draw: number): URLSearchParams {
     params[`columns[${i}][data]`] = String(i)
     params[`columns[${i}][name]`] = name
     params[`columns[${i}][searchable]`] = "true"
+    // Link column (index 0) is not sortable in NUFORC's table config
     params[`columns[${i}][orderable]`] = i === 0 ? "false" : "true"
     params[`columns[${i}][search][value]`] = ""
     params[`columns[${i}][search][regex]`] = "false"
@@ -140,7 +135,6 @@ async function fetchPage(start: number, draw: number): Promise<SightingRow[]> {
   }
 
   try {
-    // Validate response shape at runtime
     const json = await resp.json()
     if (!json || !Array.isArray((json as NuforcApiResponse).data)) {
       throw new Error(`Unexpected API response shape: ${JSON.stringify(json).slice(0, 200)}`)
@@ -217,7 +211,6 @@ async function scrapeAll(options: { maxRecords?: number }): Promise<Sighting[]> 
         const sightings = rows.map(parseSighting).filter(s => s.id !== "")
         console.log(`Retrieved ${sightings.length} valid sightings from this page`)
 
-        // Add sightings up to the max limit
         if (maxRecords) {
           const remainingSlots = maxRecords - allSightings.length;
           if (remainingSlots <= 0) {
@@ -282,7 +275,6 @@ function writeResultsSafely(sightings: Sighting[], options: { pretty: boolean; f
 
     if (!maxRecords && fs.existsSync(OUTPUT_FILE)) {
       try {
-        // Validate existing file is an array before comparing counts
         const parsed = JSON.parse(fs.readFileSync(OUTPUT_FILE, "utf-8"))
         if (Array.isArray(parsed) && shouldAbortWrite(sightings.length, parsed.length, force)) {
           fs.unlinkSync(TMP_FILE)
