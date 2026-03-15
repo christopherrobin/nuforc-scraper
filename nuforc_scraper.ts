@@ -19,12 +19,15 @@ export type Sighting = {
   explanation: string | null
 }
 
+// Type for a single row from the API
+export type SightingRow = (string | null)[]
+
 // Type for the API response
 type NuforcApiResponse = {
   draw: number
   recordsTotal: number
   recordsFiltered: number
-  data: any[][]
+  data: SightingRow[]
 }
 
 const ENDPOINT =
@@ -37,8 +40,10 @@ const parsedMaxRecords = Number(process.env.MAX_RECORDS)
 const MAX_RECORDS = Number.isFinite(parsedMaxRecords) && parsedMaxRecords > 0 ? parsedMaxRecords : undefined
 
 const PAGE_SIZE = 100
+const OUTPUT_FILE = "nuforc-results.json"
+const TMP_FILE = "nuforc-results.tmp.json"
 
-export const parseSighting = (row: any[]): Sighting => {
+export const parseSighting = (row: SightingRow): Sighting => {
   try {
     // Parse href and id from <a ... href="...">...</a>
     const root = parse(row[0] ?? "")
@@ -97,7 +102,7 @@ export const parseSighting = (row: any[]): Sighting => {
   }
 }
 
-async function fetchPage(start: number, draw: number): Promise<any[][]> {
+async function fetchPage(start: number, draw: number): Promise<SightingRow[]> {
   const formBody = new URLSearchParams({
     draw: draw.toString(),
     "columns[0][data]": "0",
@@ -325,20 +330,18 @@ async function main() {
     }
   }
 
-  console.log(`Scraped ${allSightings.length} sightings. Writing to nuforc-results.json...`)
+  console.log(`Scraped ${allSightings.length} sightings. Writing to ${OUTPUT_FILE}...`)
 
-  const outputFile = "nuforc-results.json"
-  const tmpFile = "nuforc-results.tmp.json"
   const jsonContent = pretty ? JSON.stringify(allSightings, null, 2) : JSON.stringify(allSightings)
 
   try {
-    fs.writeFileSync(tmpFile, jsonContent)
+    fs.writeFileSync(TMP_FILE, jsonContent)
 
-    if (!maxRecords && fs.existsSync(outputFile)) {
+    if (!maxRecords && fs.existsSync(OUTPUT_FILE)) {
       try {
-        const existing = JSON.parse(fs.readFileSync(outputFile, "utf-8")) as unknown[]
+        const existing = JSON.parse(fs.readFileSync(OUTPUT_FILE, "utf-8")) as unknown[]
         if (shouldAbortWrite(allSightings.length, existing.length, force)) {
-          fs.unlinkSync(tmpFile)
+          fs.unlinkSync(TMP_FILE)
           console.error(`ABORTED: New scrape has ${allSightings.length} records but existing file has ${existing.length}. This looks like a failed scrape. Use --force to overwrite anyway.`)
           process.exit(1)
         }
@@ -347,8 +350,8 @@ async function main() {
       }
     }
 
-    fs.renameSync(tmpFile, outputFile)
-    console.log("Successfully wrote data to nuforc-results.json")
+    fs.renameSync(TMP_FILE, OUTPUT_FILE)
+    console.log(`Successfully wrote data to ${OUTPUT_FILE}`)
   } catch (error) {
     console.error("Error writing to file:", error)
     const backupFilename = `nuforc-results-backup-${Date.now()}.json`

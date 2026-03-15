@@ -19,7 +19,7 @@ A Node.js/TypeScript scraper that collects UFO sighting data from the [National 
 ## Installation
 
 ```bash
-npm install
+yarn install
 ```
 
 ## Configuration
@@ -35,19 +35,19 @@ The scraper can be configured using environment variables:
 Run the scraper to collect all records:
 
 ```bash
-npm run scrape
+yarn scrape
 ```
 
 For testing purposes, you can limit the number of records:
 
 ```bash
-npm run scrape -- --max-records=10
+yarn scrape --max-records=10
 ```
 
 Or using the start script:
 
 ```bash
-npm start -- --max-records=10
+yarn start --max-records=10
 ```
 
 ## Output
@@ -89,7 +89,7 @@ yarn test:watch
 Build the TypeScript code:
 
 ```bash
-npm run build
+yarn build
 ```
 
 This will compile the TypeScript code to JavaScript in the `dist` directory.
